@@ -1,0 +1,5 @@
+# Dit is een CODEOWNERS bestand dat de eigenaren van de code definieert
+# Voor meer informatie over dit bestand, zie: https://help.github.com/en/github/creating-cloning-and-archiving-repositories/about-code-owners
+
+# Standaard eigenaars voor alles in de repository
+* @USERNAME 
