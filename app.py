@@ -3,6 +3,7 @@ import requests
 import json
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
 from datetime import datetime
 import os
 from dotenv import load_dotenv
@@ -28,6 +29,15 @@ API_ENDPOINT_MAPPINGS = {
         "timeseries_endpoint": "/rest/fewspiservice/v1/timeseries"
     }
 }
+
+# Deltares/FEWS huisstijl kleuren
+DELTARES_BLUE = "#0079C2"  # Primaire Deltares kleur
+DELTARES_DARK_BLUE = "#003D5F"
+DELTARES_LIGHT_BLUE = "#E4F2F7"
+DELTARES_WHITE = "#FFFFFF"
+DELTARES_BLACK = "#000000"
+DELTARES_LIGHT_GREY = "#F0F0F0"
+DELTARES_DARK_GREY = "#606060"
 
 # Functie om de juiste endpoints te bepalen voor de gegeven API URL
 def get_endpoints(api_url):
@@ -317,9 +327,16 @@ def fetch_timeseries(api_url, location_ids, parameter_ids, start_date, end_date)
     # Maak een unieke legenda-identifier per combinatie van locatie en parameter
     df["series_id"] = df["locationId"] + " - " + df["parameterId"]
     
+    # Deltares kleurenpalet voor de plot
+    deltares_colors = [
+        DELTARES_BLUE, DELTARES_DARK_BLUE, DELTARES_LIGHT_BLUE, 
+        "#5DACDB", "#8ABCDB", "#B9D9ED"  # Extra lichtblauwe tinten
+    ]
+    
     # Maak één enkele plot met aparte lijnen voor elke unieke combinatie
     fig = px.line(df, x="timestamp", y="value", color="series_id", 
-                 title=f"Tijdseries voor alle locatie-parameter combinaties")
+                 title=f"Tijdseries voor alle locatie-parameter combinaties",
+                 color_discrete_sequence=deltares_colors)
     
     # Voeg markers toe voor elke meting
     fig.update_traces(mode='lines+markers', marker=dict(size=6))
@@ -330,15 +347,25 @@ def fetch_timeseries(api_url, location_ids, parameter_ids, start_date, end_date)
         yaxis_title="Waarde",
         legend_title="Locatie - Parameter",
         hovermode="x unified",  # Alle waardes tonen bij hover op dezelfde x-positie
+        font=dict(family="Roboto, Arial, sans-serif"),
+        plot_bgcolor=DELTARES_WHITE,
+        paper_bgcolor=DELTARES_WHITE,
+        title_font=dict(size=18, color=DELTARES_BLACK),
         legend=dict(
             orientation="v",
             yanchor="top",
             y=0.99,
             xanchor="left",
             x=1.02,
-            title_font=dict(size=12)
-        )
+            title_font=dict(size=12),
+            font=dict(size=10)
+        ),
+        margin=dict(l=50, r=150, t=80, b=50)
     )
+    
+    # Update axes
+    fig.update_xaxes(showgrid=True, gridwidth=0.5, gridcolor='rgba(0,0,0,0.1)')
+    fig.update_yaxes(showgrid=True, gridwidth=0.5, gridcolor='rgba(0,0,0,0.1)')
     
     return f"Tijdseries gevonden voor de geselecteerde criteria", df, fig
 
@@ -362,75 +389,193 @@ def update_api_url(api_url):
     
     return api_url, loc_status, loc_df, loc_options, param_status, param_df, param_options
 
+# Custom CSS voor Deltares/FEWS stijl
+css = """
+:root {
+    --deltares-blue: #0079C2;
+    --deltares-dark-blue: #003D5F;
+    --deltares-light-blue: #E4F2F7;
+    --deltares-white: #FFFFFF;
+    --deltares-black: #000000;
+    --deltares-light-grey: #F0F0F0;
+    --deltares-dark-grey: #606060;
+}
+
+body, .gradio-container {
+    font-family: 'Roboto', Arial, sans-serif !important;
+    color: var(--deltares-black);
+    background-color: var(--deltares-white);
+}
+
+h1 {
+    color: var(--deltares-blue) !important;
+    font-weight: 700 !important;
+    margin-bottom: 10px !important;
+}
+
+h2, h3 {
+    color: var(--deltares-dark-blue) !important;
+    font-weight: 600 !important;
+    margin-top: 20px !important;
+}
+
+.header-logo {
+    display: flex;
+    align-items: center;
+    margin-bottom: 20px;
+    background-color: var(--deltares-white) !important;
+}
+
+.header-logo img {
+    height: 70px;
+    margin-right: 20px;
+}
+
+.btn-primary {
+    background-color: var(--deltares-blue) !important;
+    border-color: var(--deltares-blue) !important;
+}
+
+.btn-primary:hover {
+    background-color: var(--deltares-dark-blue) !important;
+    border-color: var(--deltares-dark-blue) !important;
+}
+
+.status-message {
+    padding: 10px;
+    border-radius: 4px;
+    background-color: var(--deltares-light-grey);
+    margin: 10px 0;
+}
+
+.tabs .tab-nav * {
+    color: var(--deltares-blue) !important;
+}
+
+.footer {
+    margin-top: 30px;
+    padding-top: 20px;
+    border-top: 1px solid #eee;
+    text-align: center;
+    font-size: 0.9em;
+    color: var(--deltares-dark-grey);
+}
+"""
+
+# Delft-FEWS logo URL (officiële bron)
+fews_logo_url = "https://oss.deltares.nl/o/deltares-fews-theme/images/logo.svg"
+
 # UI opbouw
-with gr.Blocks(title="FEWS Webservices Explorer") as demo:
-    gr.Markdown("# FEWS Webservices Explorer")
-    gr.Markdown("Deze applicatie maakt het mogelijk om data op te vragen van een FEWS Webservice.")
+with gr.Blocks(title="FEWS Webservices Explorer", css=css) as demo:
+    with gr.Column():
+        # Header met Delft-FEWS branding
+        with gr.Row(elem_classes="header-logo"):
+            gr.HTML(f"""
+                <div style="background-color: white; padding: 20px; width: 100%; display: flex; align-items: center; border-bottom: 3px solid #0079C2;">
+                    <img src="{fews_logo_url}" alt="Delft-FEWS Logo" style="height: 60px; margin-right: 20px;">
+                    <div>
+                        <h1 style="color: #0079C2; margin: 0; font-size: 28px; font-weight: bold;">FEWS Webservices Explorer</h1>
+                        <p style="color: #003D5F; margin: 0;">Data explorer voor FEWS webservice endpoints</p>
+                    </div>
+                </div>
+            """)
     
-    # API URL instelling met bekende voorbeelden
-    with gr.Row():
-        api_url_input = gr.Textbox(
-            label="API URL", 
-            placeholder="Voer de URL van de FEWS REST service in",
-            value=DEFAULT_API_URL,
-            info="Bijvoorbeeld: https://ffws2.savagis.org/FewsWebServices of https://rwsos-dataservices-ont.avi.deltares.nl/iwp/FewsWebServices"
-        )
-        update_api_btn = gr.Button("Verbinden en data ophalen")
-    
-    # Status berichten
-    with gr.Row():
-        locations_status = gr.Textbox(label="Status Locaties", interactive=False)
-        parameters_status = gr.Textbox(label="Status Parameters", interactive=False)
-    
-    # Verborgen containers voor data
-    locations_df = gr.DataFrame(label="Locaties", visible=False)
-    parameters_df = gr.DataFrame(label="Parameters", visible=False)
-    
-    # Tijdseries sectie
-    gr.Markdown("## Tijdseries ophalen")
-    with gr.Row():
-        with gr.Column():
-            # Locatie dropdown - alleen IDs, met verbeterde instellingen
-            location_dropdown = gr.Dropdown(
-                label="Selecteer locatie", 
-                multiselect=True,
-                interactive=True,
-                info="Selecteer één of meerdere locatie-IDs",
-                scale=2,
-                allow_custom_value=True,
-                filterable=True,
-                value=[]  # Lege lijst als standaardwaarde om dropdown te laten tonen
-            )
-            
-            # Parameter dropdown - alleen IDs, met verbeterde instellingen
-            parameter_dropdown = gr.Dropdown(
-                label="Selecteer parameter", 
-                multiselect=True,
-                interactive=True,
-                info="Selecteer één of meerdere parameter-IDs",
-                scale=2,
-                allow_custom_value=True,
-                filterable=True,
-                value=[]  # Lege lijst als standaardwaarde om dropdown te laten tonen
-            )
+        # Introductie
+        with gr.Row():
+            gr.Markdown("""
+                ### Over deze applicatie
+                Deze applicatie maakt het mogelijk om op een gemakkelijke manier data op te vragen van een FEWS Webservice. 
+                Voer een geldige FEWS webservice URL in, selecteer locaties en parameters, en visualiseer tijdseries.
+            """)
         
-        with gr.Column():
-            start_date_input = gr.Textbox(label="Startdatum (YYYY-MM-DD)")
-            end_date_input = gr.Textbox(label="Einddatum (YYYY-MM-DD)")
-    
-    with gr.Row():
-        timeseries_btn = gr.Button("Tijdseries ophalen")
-    
-    with gr.Row():
-        timeseries_status = gr.Textbox(label="Status Tijdseries", interactive=False)
-    
-    with gr.Row():
-        timeseries_df = gr.DataFrame(label="Tijdseries Data")
-    
-    # Enkele plot voor alle tijdseries
-    gr.Markdown("### Tijdseries voor alle locatie-parameter combinaties")
-    with gr.Row():
-        timeseries_plot = gr.Plot(label="Tijdseries")
+        # API URL sectie
+        with gr.Row():
+            with gr.Column(scale=3):
+                api_url_input = gr.Textbox(
+                    label="API URL", 
+                    placeholder="Voer de URL van de FEWS REST service in",
+                    value=DEFAULT_API_URL,
+                    info="Bijvoorbeeld: https://ffws2.savagis.org/FewsWebServices of https://rwsos-dataservices-ont.avi.deltares.nl/iwp/FewsWebServices"
+                )
+            with gr.Column(scale=1):
+                update_api_btn = gr.Button("Verbinden en data ophalen", variant="primary", elem_classes="btn-primary")
+        
+        # Status berichten met modern ontwerp
+        with gr.Row():
+            with gr.Column():
+                locations_status = gr.Textbox(label="Status Locaties", interactive=False, elem_classes="status-message")
+            with gr.Column():
+                parameters_status = gr.Textbox(label="Status Parameters", interactive=False, elem_classes="status-message")
+        
+        # Verborgen containers voor data
+        locations_df = gr.DataFrame(label="Locaties", visible=False)
+        parameters_df = gr.DataFrame(label="Parameters", visible=False)
+        
+        # Tijdseries sectie
+        gr.Markdown("## Tijdseries opvragen en visualiseren")
+        
+        with gr.Row():
+            with gr.Column(scale=3):
+                with gr.Row():
+                    with gr.Column(scale=2):
+                        # Locatie dropdown met verbeterde styling
+                        location_dropdown = gr.Dropdown(
+                            label="Selecteer locatie(s)", 
+                            multiselect=True,
+                            interactive=True,
+                            info="Selecteer één of meerdere locatie-IDs",
+                            allow_custom_value=True,
+                            filterable=True,
+                            value=[]
+                        )
+                        
+                        # Parameter dropdown met verbeterde styling
+                        parameter_dropdown = gr.Dropdown(
+                            label="Selecteer parameter(s)", 
+                            multiselect=True,
+                            interactive=True,
+                            info="Selecteer één of meerdere parameter-IDs",
+                            allow_custom_value=True,
+                            filterable=True,
+                            value=[]
+                        )
+                    
+                    with gr.Column(scale=1):
+                        start_date_input = gr.Textbox(
+                            label="Startdatum", 
+                            placeholder="YYYY-MM-DD",
+                            info="Laat leeg voor alle beschikbare data"
+                        )
+                        end_date_input = gr.Textbox(
+                            label="Einddatum", 
+                            placeholder="YYYY-MM-DD",
+                            info="Laat leeg voor alle beschikbare data"
+                        )
+                        timeseries_btn = gr.Button("Tijdseries ophalen", variant="primary", elem_classes="btn-primary")
+            
+        with gr.Row():
+            timeseries_status = gr.Textbox(label="Status Tijdseries", interactive=False, elem_classes="status-message")
+        
+        # Resultaten sectie
+        with gr.Row():
+            with gr.Column():
+                gr.Markdown("### Resultaten")
+                # Tab interface voor verschillende weergavemethoden
+                with gr.Tabs():
+                    with gr.TabItem("Grafiek"):
+                        timeseries_plot = gr.Plot(label="Tijdseries")
+                    with gr.TabItem("Tabel"):
+                        timeseries_df = gr.DataFrame(label="Tijdseries Data")
+        
+        # Footer
+        with gr.Row(elem_classes="footer"):
+            gr.HTML(f"""
+                <div class="footer">
+                    <p>© Deltares | Ontwikkeld voor FEWS Data Exploratie</p>
+                    <p><a href="https://huggingface.co/spaces/tberends/fewswsexplorer" target="_blank" style="color: #0079C2;">Hugging Face Space</a> | 
+                    <a href="https://github.com/gebruikersnaam/repo-naam" target="_blank" style="color: #0079C2;">GitHub Repository</a></p>
+                </div>
+            """)
     
     # Update API URL actie
     update_api_btn.click(

@@ -122,5 +122,3 @@ https://publicwiki.deltares.nl/display/FEWSDOC/FEWS+Web+Services
 ## Licentie
 
 Dit project is gelicentieerd onder de MIT-licentie.
-
-Zie de [volledige documentatie](https://github.com/je-gebruikersnaam/je-repo-naam) voor meer informatie.
